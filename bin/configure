@@ -1,0 +1,125 @@
+#!/bin/bash
+
+set -e
+
+. "${INSTALLER_DIR}/wizard"
+
+migrate() {
+	local from="${APP_NAME}/$1"
+	local to="$2"
+	if db_get "$from" ; then
+		wiz_set "$to" "$RET"
+	fi	
+}
+
+migrate_mysql_config() {
+	if db_get "${APP_NAME}/mysql/autoinstall" ; then
+		local autoinstall="$RET"
+		if [ "$autoinstall" = "create a new database" ] || [ "$autoinstall" = "reuse an existing database" ] ; then
+			# copy over settings
+			wiz_set "mysql/autoinstall" "existing"
+			# mysql/ssl
+			db_get "${APP_NAME}/mysql/ssl"
+			if [ "$RET" = "true" ] ; then
+				wiz_set "mysql/ssl" "yes"
+			else
+				wiz_set "mysql/ssl" "no"
+			fi
+			migrate "mysql/db_host" "mysql/db_host"
+			migrate "mysql/db_port" "mysql/db_port"
+			migrate "mysql/db_username" "mysql/db_username"
+			migrate "mysql/db_password" "mysql/db_password"
+			migrate "mysql/db_source_host" "mysql/db_source_host"
+			migrate "mysql/db_name" "mysql/db_name"
+			migrate "mysql/ssl_ca" "mysql/ssl_ca"
+			migrate "mysql/ssl_cert" "mysql/ssl_cert"
+			migrate "mysql/ssl_key" "mysql/ssl_key"
+		else
+			wiz_set "mysql/autoinstall" "skip"
+		fi
+	fi
+}
+
+migrate_apache2_config() {
+	if db_get "${APP_NAME}/server/autoinstall" ; then
+		local autoinstall="$RET"
+		if [ "$autoinstall" = "true" ] ; then
+			wiz_set "server/autoinstall" "install"
+			migrate "server/hostname" "server/hostname"
+			migrate "server/ssl_cert" "server/ssl_cert"
+			migrate "server/ssl_key" "server/ssl_key"
+			migrate "server/ssl_ca" "server/ssl_ca"
+
+			if db_get "${APP_NAME}/server/ssl" && [ "$RET" = "true" ] ; then
+				wiz_set "server/ssl" "yes"
+			else
+				wiz_set "server/ssl" "no"
+			fi
+		else
+			wiz_set "server/autoinstall" "skip"
+		fi
+	fi
+
+}
+
+migrate_smtp_config() {
+	if db_get "${APP_NAME}/smtp/method" ; then
+		local method="$RET"
+		if [ "$method" = "sendmail" ] ; then
+			wiz_set "smtp/autoinstall" "sendmail"
+			migrate "smtp/admin_email" "smtp/admin_email"
+		elif [ "$method" = "smtp" ] ; then
+			wiz_set "smtp/autoinstall" "smtp"
+			migrate "smtp/host" "smtp/host"
+			migrate "smtp/port" "smtp/port"
+			migrate "smtp/domain" "smtp/domain"
+			migrate "smtp/username" "smtp/username"
+			migrate "smtp/password" "smtp/password"
+			migrate "smtp/admin_email" "smtp/admin_email"
+		else
+			wiz_set "smtp/autoinstall" "skip"
+		fi
+	fi
+}
+
+migrate_svn_dav_config() {
+	if db_get "${APP_NAME}/svn-dav/autoinstall" && [ "$RET" = "true" ] ; then
+		migrate "svn-dav/repositories" "svn-dav/repositories"
+		migrate "svn-dav/api-key" "svn-dav/api-key"
+	fi
+}
+
+migrate_memcached_config() {
+	wiz_set "memcached/autoinstall" "install"
+}
+
+input_start() {
+	if [ -f "/usr/share/debconf/confmodule" ] ; then
+		. /usr/share/debconf/confmodule
+		migrate_mysql_config
+		migrate_apache2_config
+		migrate_smtp_config
+		migrate_svn_dav_config
+		migrate_memcached_config
+		STATE="done"
+	else
+		STATE="done"
+	fi
+}
+
+state_machine() {
+	case "$1" in
+		"start")
+			input_start
+			;;
+		"done")
+			break
+			;;
+		*)
+			echo "invalid state: ${STATE}"
+			break
+			;;
+	esac
+}
+
+wizard "start"
