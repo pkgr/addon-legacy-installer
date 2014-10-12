@@ -17,7 +17,7 @@ migrate_mysql_config() {
 		local autoinstall="$RET"
 		if [ "$autoinstall" = "create a new database" ] || [ "$autoinstall" = "reuse an existing database" ] ; then
 			# copy over settings
-			wiz_set "mysql/autoinstall" "existing"
+			wiz_set "mysql/autoinstall" "reuse"
 			# mysql/ssl
 			db_get "${APP_NAME}/mysql/ssl"
 			if [ "$RET" = "true" ] ; then
@@ -90,7 +90,10 @@ migrate_svn_dav_config() {
 }
 
 migrate_memcached_config() {
-	wiz_set "memcached/autoinstall" "install"
+	# only migrate if existing debconf value, to avoid resetting this setting after the legacy installer has been run once
+	if db_get "${APP_NAME}/mysql/autoinstall" ; then
+		wiz_set "memcached/autoinstall" "install"
+	fi
 }
 
 input_start() {
