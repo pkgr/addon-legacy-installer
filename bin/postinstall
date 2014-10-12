@@ -5,25 +5,24 @@ set -e
 . ${INSTALLER_DIR}/wizard
 
 if [ -f "/usr/share/debconf/confmodule" ] ; then
-	. /usr/share/debconf/confmodule
 
-	if db_get "${APP_NAME}/mysql/autoinstall" && ! [ "$RET" = "skip" ] ; then
+	if echo GET ${APP_NAME}/mysql/autoinstall | debconf-communicate &>/dev/null ; then
 		rm -rf /etc/${APP_NAME}/mysql
 		echo PURGE | debconf-communicate ${APP_NAME}-mysql
 	fi
 
-	if db_get "${APP_NAME}/server/autoinstall" && [ "$RET" = "true" ] ; then
+	if echo GET ${APP_NAME}/server/autoinstall | debconf-communicate &>/dev/null ; then
 		a2dissite ${APP_NAME} || true
 		rm -rf /etc/${APP_NAME}/apache2
 		echo PURGE | debconf-communicate ${APP_NAME}-apache2
 	fi
 
-	if db_get "${APP_NAME}/smtp/method" ; then
+	if echo GET ${APP_NAME}/smtp/method | debconf-communicate &>/dev/null ; then
 		rm -f /etc/${APP_NAME}/conf.d/smtp
 		echo PURGE | debconf-communicate ${APP_NAME}-smtp
 	fi
 
-	if db_get "${APP_NAME}/svn-dav/autoinstall" && [ "$RET" = "true" ] ; then
+	if echo GET ${APP_NAME}/svn-dav/autoinstall | debconf-communicate &>/dev/null ; then
 		rm -f /etc/${APP_NAME}/conf.d/sys-api-key
 		rm -f /etc/${APP_NAME}/conf.d/svn-dav
 		echo PURGE | debconf-communicate ${APP_NAME}-svn-dav
